@@ -1,0 +1,8 @@
+[project]
+name = "quamix180-ai-cmo"
+version = "0.1.0"
+description = "Approval-gated QUAMIX marketing workflow foundation"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
