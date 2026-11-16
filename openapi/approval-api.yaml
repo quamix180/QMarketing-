@@ -1,0 +1,193 @@
+openapi: 3.1.0
+info:
+  title: QUAMIX180 AI CMO Approval API
+  version: 0.1.0
+  description: |
+    Design contract for the future authenticated human-review service.
+    This specification is not a deployed API. Publishing endpoints are
+    intentionally absent; approval records decisions only.
+servers:
+  - url: https://{host}
+    variables:
+      host:
+        default: approval-api.example.invalid
+security:
+  - bearerAuth: []
+paths:
+  /v1/approvals:
+    get:
+      operationId: listPendingApprovals
+      summary: List approval requests visible to the authenticated reviewer
+      description: |
+        Requires server-side authorization using verified identity claims.
+        The server must scope results to the reviewer's assigned brand and
+        destination-account permissions; clients cannot supply or override
+        reviewer identity or authorization scope.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected, revoked]
+            default: pending
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 512
+      responses:
+        "200":
+          description: Approval records visible to the caller
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/approvals/{approvalId}:
+    get:
+      operationId: getApproval
+      summary: Retrieve a review request and immutable package snapshot
+      parameters:
+        - $ref: "#/components/parameters/ApprovalId"
+      responses:
+        "200":
+          description: Approval request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Not found or not visible to caller
+  /v1/approvals/{approvalId}/decision:
+    post:
+      operationId: decideApproval
+      summary: Approve or reject one exact immutable content package
+      description: |
+        This operation records a human decision only. It MUST NOT publish,
+        schedule, queue, or transmit content to a social platform. Approval
+        is single-use and bound server-side to content ID, version, channel,
+        destination account, action and package SHA-256. A changed package
+        requires a new version and a new approval request.
+      parameters:
+        - $ref: "#/components/parameters/ApprovalId"
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionRequest"
+      responses:
+        "200":
+          description: Decision recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionResult"
+        "400":
+          description: Invalid decision or request
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Not found or not visible to caller
+        "409":
+          description: Already decided, revoked, stale package, or idempotency conflict
+        "422":
+          description: Package or approval binding validation failed
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Production tokens must be validated by a configured OIDC/JWT verifier.
+        Validate signature, issuer, audience, expiry, not-before, algorithm
+        allowlist, key rotation and trusted role claims. Never trust roles
+        supplied in request bodies or headers.
+  parameters:
+    ApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+  responses:
+    Unauthorized:
+      description: Missing, invalid, expired, or untrusted credential
+    Forbidden:
+      description: Authenticated principal lacks the required role or scope
+  schemas:
+    ApprovalList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovalSummary"
+        nextCursor:
+          type: [string, "null"]
+    ApprovalSummary:
+      type: object
+      required: [approvalId, contentId, version, channel, destinationAccountId, packageSha256, status, createdAt]
+      properties:
+        approvalId: { type: string }
+        contentId: { type: string }
+        version: { type: integer, minimum: 1 }
+        channel: { type: string, enum: [LinkedIn, Instagram, Facebook, YouTube, X, TikTok] }
+        destinationAccountId: { type: string }
+        packageSha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+        status: { type: string, enum: [pending, approved, rejected, revoked] }
+        createdAt: { type: string, format: date-time }
+    ApprovalDetail:
+      allOf:
+        - $ref: "#/components/schemas/ApprovalSummary"
+        - type: object
+          properties:
+            package:
+              type: object
+              description: Immutable, reviewable content and media/source manifest snapshot
+              additionalProperties: true
+    DecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision, packageSha256]
+      properties:
+        decision:
+          type: string
+          enum: [approved, rejected]
+        packageSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        comment:
+          type: string
+          maxLength: 2000
+    DecisionResult:
+      type: object
+      required: [approvalId, status, decidedAt]
+      properties:
+        approvalId: { type: string }
+        status: { type: string, enum: [approved, rejected] }
+        decidedAt: { type: string, format: date-time }
