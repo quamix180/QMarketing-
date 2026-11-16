@@ -120,6 +120,36 @@ class CMOStore:
             self._audit(connection, "system:local", "lead.recorded", "lead", lead_id,
                         {"source": source, "pipeline_stage": pipeline_stage})
 
+    def decide_approval(self, approval_id: str, decision: str, approver_subject: str) -> bool:
+        if decision not in {"approved", "rejected"}:
+            raise ValueError("decision must be approved or rejected")
+        now = utc_now()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """UPDATE approvals SET decision = ?, approver_subject = ?, decided_at = ?
+                   WHERE approval_id = ? AND decision = 'pending'""",
+                (decision, approver_subject, now, approval_id),
+            )
+            if cursor.rowcount == 1:
+                self._audit(connection, approver_subject, f"approval.{decision}", "approval",
+                            approval_id, {})
+                return True
+            return False
+
+    def revoke_approval(self, approval_id: str, actor_subject: str) -> bool:
+        now = utc_now()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """UPDATE approvals SET decision = 'revoked', approver_subject = ?, decided_at = ?
+                   WHERE approval_id = ? AND decision = 'approved'""",
+                (actor_subject, now, approval_id),
+            )
+            if cursor.rowcount == 1:
+                self._audit(connection, actor_subject, "approval.revoked", "approval",
+                            approval_id, {})
+                return True
+            return False
+
     def get_campaign(self, campaign_id: str) -> dict[str, Any] | None:
         with self._connect() as connection:
             row = connection.execute("SELECT * FROM campaigns WHERE campaign_id = ?", (campaign_id,)).fetchone()
