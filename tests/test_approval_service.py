@@ -91,6 +91,12 @@ class ApprovalServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(ApprovalServiceError, "no longer pending"):
             self.service.decide("approval", self.package, "valid-test-credential")
 
+    def test_rejection_is_recorded_without_opening_publish_gate(self):
+        self.service.decide("approval", self.package, "valid-test-credential", "rejected")
+        record = self.store.get_approval("approval")
+        self.assertEqual(record["decision"], "rejected")
+        self.assertEqual(record["approver_subject"], "founder-123")
+
     def test_unsupported_decision_rejected(self):
         with self.assertRaisesRegex(ApprovalServiceError, "must be approved or rejected"):
             self.service.decide("approval", self.package, "valid-test-credential", "publish")
