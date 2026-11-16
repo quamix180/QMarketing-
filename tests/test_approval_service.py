@@ -73,6 +73,19 @@ class ApprovalServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(ApprovalServiceError, "exact publication package"):
             self.service.decide("approval", changed, "valid-test-credential")
 
+    def test_stored_content_version_digest_must_match(self):
+        self.store.add_content_version(
+            "content", 2, "LinkedIn", {"text": "different persisted version"},
+            content_sha256="f" * 64,
+        )
+        from dataclasses import replace
+        changed_package = replace(self.package, version=2)
+        self.store.create_approval(
+            "approval-v2", "content", 2, "LinkedIn", "page-1", changed_package.digest(),
+        )
+        with self.assertRaisesRegex(ApprovalServiceError, "persisted content version"):
+            self.service.decide("approval-v2", changed_package, "valid-test-credential")
+
     def test_second_decision_is_rejected(self):
         self.service.decide("approval", self.package, "valid-test-credential")
         with self.assertRaisesRegex(ApprovalServiceError, "no longer pending"):
