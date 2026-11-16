@@ -155,6 +155,15 @@ class CMOStore:
             row = connection.execute("SELECT * FROM campaigns WHERE campaign_id = ?", (campaign_id,)).fetchone()
             return dict(row) if row else None
 
+    def get_content_version(self, content_id: str, version: int, channel: str) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM content_versions
+                   WHERE content_id = ? AND version = ? AND channel = ?""",
+                (content_id, version, channel),
+            ).fetchone()
+            return dict(row) if row else None
+
     def get_content_versions(self, content_id: str) -> list[dict[str, Any]]:
         with self._connect() as connection:
             rows = connection.execute(
