@@ -63,6 +63,11 @@ class ApprovalService:
             raise ApprovalServiceError("approval request does not exist")
         if record["decision"] != "pending":
             raise ApprovalServiceError("approval request is no longer pending")
+        stored_version = self.store.get_content_version(
+            package.content_id, package.version, package.channel
+        )
+        if stored_version is None or stored_version["content_sha256"] != package.digest():
+            raise ApprovalServiceError("publication package does not match the persisted content version")
         if (
             record["content_id"] != package.content_id
             or record["version"] != package.version
