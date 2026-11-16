@@ -87,11 +87,16 @@ class ApprovalService:
             approved_at=approved_at,
             scope="single_package_publish",
         )
-        gate = ApprovalGate({principal.subject}, self.allowed_channels)
-        try:
-            gate.validate(package, approval)
-        except ValueError as exc:
-            raise ApprovalServiceError(f"approval policy rejected request: {exc}") from exc
+        # The publication gate validates permission to publish, so it applies
+        # only to an approval decision. A rejection still requires the exact
+        # persisted package binding above, but must remain possible for a
+        # reviewer who is preventing publication.
+        if decision == "approved":
+            gate = ApprovalGate({principal.subject}, self.allowed_channels)
+            try:
+                gate.validate(package, approval)
+            except ValueError as exc:
+                raise ApprovalServiceError(f"approval policy rejected request: {exc}") from exc
 
         if not self.store.decide_approval(approval_id, decision, principal.subject):
             raise ApprovalServiceError("approval request was already decided by another reviewer")
