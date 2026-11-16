@@ -39,6 +39,26 @@ class CMOStoreTests(unittest.TestCase):
         with self.assertRaises(Exception):
             self.store.create_content_item("orphan", "missing-campaign")
 
+    def test_invalid_channel_is_rejected_by_database(self):
+        self.store.create_content_item("content-2", "camp-1")
+        with self.assertRaises(Exception):
+            self.store.add_content_version(
+                "content-2", 1, "UnknownPlatform", {"text": "Draft"},
+                content_sha256="c" * 64,
+            )
+
+    def test_duplicate_version_channel_is_rejected(self):
+        self.store.create_content_item("content-3", "camp-1")
+        self.store.add_content_version(
+            "content-3", 1, "LinkedIn", {"text": "Draft"},
+            content_sha256="d" * 64,
+        )
+        with self.assertRaises(Exception):
+            self.store.add_content_version(
+                "content-3", 1, "LinkedIn", {"text": "Replacement"},
+                content_sha256="e" * 64,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
