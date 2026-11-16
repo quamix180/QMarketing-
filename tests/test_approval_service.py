@@ -70,7 +70,7 @@ class ApprovalServiceTests(unittest.TestCase):
     def test_changed_text_cannot_be_approved(self):
         from dataclasses import replace
         changed = replace(self.package, text="Tampered after review")
-        with self.assertRaisesRegex(ApprovalServiceError, "exact publication package"):
+        with self.assertRaisesRegex(ApprovalServiceError, "persisted content version"):
             self.service.decide("approval", changed, "valid-test-credential")
 
     def test_stored_content_version_digest_must_match(self):
