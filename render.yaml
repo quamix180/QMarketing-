@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: quamix-ai-cmo-core
+    runtime: docker
+    plan: starter
+    region: singapore
+    branch: feature/deployable-cmo-core
+    dockerfilePath: ./Dockerfile
+    autoDeploy: false
+    healthCheckPath: /health
+    envVars:
+      - key: CMO_API_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
